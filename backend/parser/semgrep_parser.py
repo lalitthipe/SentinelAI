@@ -65,4 +65,5 @@ def parse_semgrep_report(report_path: str, project_id: int = 1):
 
 
 if __name__ == "__main__":
-    parse_semgrep_report("../../security/semgrep/report.json")
+    report_path = sys.argv[1] if len(sys.argv) > 1 else "../../security/semgrep/report.json"
+    parse_semgrep_report(report_path)
