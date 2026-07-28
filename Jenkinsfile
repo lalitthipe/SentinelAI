@@ -43,5 +43,17 @@ pipeline {
                 sh 'python3 ${WORKSPACE}/backend/parser/trivy_parser.py ${WORKSPACE}/security/trivy/report.json'
             }
         }
+
+        stage('Gitleaks Scan') {
+            steps {
+                sh 'gitleaks detect --source ${WORKSPACE} --report-format json --report-path ${WORKSPACE}/security/gitleaks/report.json --no-git || true'
+            }
+        }
+
+        stage('Parse Gitleaks Results') {
+            steps {
+                sh 'python3 ${WORKSPACE}/backend/parser/gitleaks_parser.py ${WORKSPACE}/security/gitleaks/report.json'
+            }
+        }
     }
 }
