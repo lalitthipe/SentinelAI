@@ -52,3 +52,14 @@ def get_scans(db: Session = Depends(get_db)):
         }
         for s in scans
     ]
+
+@app.get("/vulnerabilities/{vuln_id}/ai-report")
+def get_ai_report(vuln_id: int, db: Session = Depends(get_db)):
+    report = db.query(models.AIReport).filter(models.AIReport.vulnerability_id == vuln_id).first()
+    if not report:
+        return {"detail": "No AI report found for this vulnerability"}
+    return {
+        "summary": report.summary,
+        "risk_score": report.risk_score,
+        "remediation": report.remediation,
+    }
