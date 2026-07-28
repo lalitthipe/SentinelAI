@@ -8,9 +8,15 @@ pipeline {
             }
         }
 
-        stage('Hello') {
+        stage('Verify Docker') {
             steps {
-                echo 'Jenkins pipeline is working!'
+                sh 'docker --version'
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh 'docker compose -f docker/docker-compose.yml build'
             }
         }
     }
