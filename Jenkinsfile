@@ -31,5 +31,17 @@ pipeline {
                 sh 'python3 ${WORKSPACE}/backend/parser/semgrep_parser.py ${WORKSPACE}/security/semgrep/report.json'
             }
         }
+
+        stage('Trivy Scan') {
+            steps {
+                sh 'trivy fs ${WORKSPACE} --format json --output ${WORKSPACE}/security/trivy/report.json'
+            }
+        }
+
+        stage('Parse Trivy Results') {
+            steps {
+                sh 'python3 ${WORKSPACE}/backend/parser/trivy_parser.py ${WORKSPACE}/security/trivy/report.json'
+            }
+        }
     }
 }

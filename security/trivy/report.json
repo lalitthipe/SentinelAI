@@ -1,0 +1,93 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.71.2"
+  },
+  "ReportID": "019faa53-5c60-7ad2-b392-2b2da8b8c85a",
+  "CreatedAt": "2026-07-29T01:33:37.696711386+05:30",
+  "ArtifactID": "sha256:81a8aa753da05e1647c42d44d07ebbe3967ffa3b658a8f3687073067eeee5d7f",
+  "ArtifactName": ".",
+  "ArtifactType": "repository",
+  "Metadata": {
+    "RepoURL": "https://github.com/lalitthipe/SentinelAI.git",
+    "Branch": "main",
+    "Commit": "aa15ce79a91ab9a83c263ac94ca59eee0a95293d",
+    "CommitMsg": "Add Semgrep scan and parse stages to Jenkins pipeline",
+    "Author": "lalitthipe \u003clalitthipe07@gmail.com\u003e",
+    "Committer": "lalitthipe \u003clalitthipe07@gmail.com\u003e"
+  },
+  "Results": [
+    {
+      "Target": "frontend/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Packages": [
+        {
+          "ID": "react@19.2.8",
+          "Name": "react",
+          "Identifier": {
+            "PURL": "pkg:npm/react@19.2.8",
+            "UID": "7737e0c93c8b3372"
+          },
+          "Version": "19.2.8",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 1129,
+              "EndLine": 1136
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-dom@19.2.8",
+          "Name": "react-dom",
+          "Identifier": {
+            "PURL": "pkg:npm/react-dom@19.2.8",
+            "UID": "5c1be239814d6567"
+          },
+          "Version": "19.2.8",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "react@19.2.8",
+            "scheduler@0.27.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1137,
+              "EndLine": 1147
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "scheduler@0.27.0",
+          "Name": "scheduler",
+          "Identifier": {
+            "PURL": "pkg:npm/scheduler@0.27.0",
+            "UID": "19a330b0b4901781"
+          },
+          "Version": "0.27.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1181,
+              "EndLine": 1185
+            }
+          ],
+          "AnalyzedBy": "npm"
+        }
+      ]
+    }
+  ]
+}
