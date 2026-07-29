@@ -6,4 +6,4 @@ node_modules/
 dist/
 *.db
 .DS_Store
-__pycache__/
+security/*/report.json
