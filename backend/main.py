@@ -1,3 +1,5 @@
+from fastapi.security import OAuth2PasswordRequestForm
+from auth.auth import hash_password, verify_password, create_access_token, get_current_user
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -62,4 +64,43 @@ def get_ai_report(vuln_id: int, db: Session = Depends(get_db)):
         "summary": report.summary,
         "risk_score": report.risk_score,
         "remediation": report.remediation,
+    }
+
+@app.post("/register")
+def register(username: str, email: str, password: str, db: Session = Depends(get_db)):
+    existing = db.query(models.User).filter(models.User.username == username).first()
+    if existing:
+        return {"detail": "Username already exists"}
+
+    new_user = models.User(
+        username=username,
+        email=email,
+        hashed_password=hash_password(password),
+        role="viewer",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"id": new_user.id, "username": new_user.username, "role": new_user.role}
+
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        return {"detail": "Incorrect username or password"}
+
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/me")
+def read_current_user(current_user: models.User = Depends(get_current_user)):
+    # This endpoint only works if a valid JWT token is provided —
+    # it's our proof that auth is actually protecting something.
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role,
     }
