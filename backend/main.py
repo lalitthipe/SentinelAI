@@ -1,3 +1,6 @@
+from fastapi.responses import StreamingResponse
+import csv
+import io
 from fastapi.security import OAuth2PasswordRequestForm
 from auth.auth import hash_password, verify_password, create_access_token, get_current_user
 from fastapi import FastAPI, Depends, HTTPException
@@ -218,3 +221,23 @@ def get_snort_alerts(db: Session = Depends(get_db), current_user: models.User = 
         }
         for a in alerts
     ]
+
+@app.get("/reports/vulnerabilities/csv")
+def export_vulnerabilities_csv(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    vulns = db.query(models.Vulnerability).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Title", "Description", "Severity", "File Path", "Line Number", "Status"])
+
+    for v in vulns:
+        writer.writerow([v.id, v.title, v.description, v.severity, v.file_path, v.line_number, v.status])
+
+    output.seek(0)
+    log_action(db, current_user.id, "report_exported", "Exported vulnerabilities CSV")
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=vulnerabilities_report.csv"},
+    )
