@@ -112,7 +112,7 @@ function App() {
           }}
         />
 
-        <button
+	<button
           onClick={fetchVulnerabilities}
           style={{
             background: "#3b82f6", color: "#fff", border: "none",
@@ -121,7 +121,34 @@ function App() {
         >
           Search
         </button>
+
+        <a
+          href={`${API_BASE}/reports/vulnerabilities/csv`}
+          onClick={(e) => {
+            e.preventDefault();
+            fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) => res.blob())
+              .then((blob) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "vulnerabilities_report.csv";
+                a.click();
+                window.URL.revokeObjectURL(url);
+              });
+          }}
+          style={{
+            background: "#22c55e", color: "#fff", border: "none",
+            padding: "6px 16px", borderRadius: "4px", cursor: "pointer",
+            textDecoration: "none", display: "inline-flex", alignItems: "center",
+          }}
+        >
+          Download CSV
+        </a>
       </div>
+
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
