@@ -18,6 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def log_action(db: Session, user_id: int, action: str, details: str = None):
+    entry = models.AuditLog(user_id=user_id, action=action, details=details)
+    db.add(entry)
+    db.commit()
+
 
 @app.get("/health")
 def health():
@@ -81,6 +86,7 @@ def register(username: str, email: str, password: str, db: Session = Depends(get
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    log_action(db, new_user.id, "register", f"New user {new_user.username} registered")
     return {"id": new_user.id, "username": new_user.username, "role": new_user.role}
 
 
@@ -91,6 +97,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         return {"detail": "Incorrect username or password"}
 
     access_token = create_access_token(data={"sub": user.username})
+    log_action(db, user.id, "login", f"User {user.username} logged in")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -104,3 +111,17 @@ def read_current_user(current_user: models.User = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role,
     }
+
+@app.get("/audit-logs")
+def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
+    return [
+        {
+            "id": log.id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "details": log.details,
+            "timestamp": str(log.timestamp),
+        }
+        for log in logs
+    ]
