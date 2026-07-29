@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import Login from "./Login";
 
 const API_BASE = "http://192.168.56.101:8000";
 
 function App() {
+  const [token, setToken] = useState(null);
   const [status, setStatus] = useState("checking...");
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
@@ -13,12 +15,18 @@ function App() {
       .then((res) => res.json())
       .then((data) => setStatus(data.status))
       .catch(() => setStatus("could not reach backend"));
-
-    fetch(`${API_BASE}/vulnerabilities`)
-      .then((res) => res.json())
-      .then((data) => setVulnerabilities(data))
-      .catch(() => setVulnerabilities([]));
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    fetch(`${API_BASE}/vulnerabilities`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setVulnerabilities(Array.isArray(data) ? data : []))
+      .catch(() => setVulnerabilities([]));
+  }, [token]);
 
   const viewAiReport = (vulnId) => {
     setLoadingId(vulnId);
@@ -44,9 +52,30 @@ function App() {
     }
   };
 
+  // Not logged in yet — show the login form instead of the dashboard
+  if (!token) {
+    return <Login onLoginSuccess={(newToken) => setToken(newToken)} />;
+  }
+
   return (
     <div style={{ fontFamily: "sans-serif", padding: "2rem", color: "#eee", background: "#111", minHeight: "100vh" }}>
-      <h1>SentinelAI</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>SentinelAI</h1>
+        <button
+          onClick={() => setToken(null)}
+          style={{
+            background: "#333",
+            color: "#eee",
+            border: "1px solid #555",
+            padding: "6px 14px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            height: "fit-content",
+          }}
+        >
+          Log Out
+        </button>
+      </div>
       <p>Backend status: {status}</p>
 
       <h2>Vulnerabilities</h2>
