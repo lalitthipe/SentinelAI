@@ -1,6 +1,6 @@
 from fastapi.security import OAuth2PasswordRequestForm
 from auth.auth import hash_password, verify_password, create_access_token, get_current_user
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
@@ -22,6 +22,11 @@ def log_action(db: Session, user_id: int, action: str, details: str = None):
     entry = models.AuditLog(user_id=user_id, action=action, details=details)
     db.add(entry)
     db.commit()
+
+def require_admin(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
 
 
 @app.get("/health")
@@ -61,7 +66,7 @@ def get_scans(db: Session = Depends(get_db), current_user: models.User = Depends
     ]
 
 @app.get("/vulnerabilities/{vuln_id}/ai-report")
-def get_ai_report(vuln_id: int, db: Session = Depends(get_db)):
+def get_ai_report(vuln_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     report = db.query(models.AIReport).filter(models.AIReport.vulnerability_id == vuln_id).first()
     if not report:
         return {"detail": "No AI report found for this vulnerability"}
@@ -113,7 +118,7 @@ def read_current_user(current_user: models.User = Depends(get_current_user)):
     }
 
 @app.get("/audit-logs")
-def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
     logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
     return [
         {
