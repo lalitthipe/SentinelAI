@@ -33,11 +33,22 @@ def require_admin(current_user: models.User = Depends(get_current_user)):
 def health():
     return {"status": "ok"}
 
-
 @app.get("/vulnerabilities")
-def get_vulnerabilities(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Fetch all vulnerability rows from Postgres and return as JSON
-    vulns = db.query(models.Vulnerability).all()
+def get_vulnerabilities(
+    severity: str = None,
+    search: str = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    query = db.query(models.Vulnerability)
+
+    if severity:
+        query = query.filter(models.Vulnerability.severity == severity)
+
+    if search:
+        query = query.filter(models.Vulnerability.title.ilike(f"%{search}%"))
+
+    vulns = query.all()
     return [
         {
             "id": v.id,
