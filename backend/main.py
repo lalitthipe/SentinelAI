@@ -25,7 +25,7 @@ def health():
 
 
 @app.get("/vulnerabilities")
-def get_vulnerabilities(db: Session = Depends(get_db)):
+def get_vulnerabilities(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Fetch all vulnerability rows from Postgres and return as JSON
     vulns = db.query(models.Vulnerability).all()
     return [
@@ -43,7 +43,7 @@ def get_vulnerabilities(db: Session = Depends(get_db)):
 
 
 @app.get("/scans")
-def get_scans(db: Session = Depends(get_db)):
+def get_scans(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     scans = db.query(models.Scan).all()
     return [
         {
