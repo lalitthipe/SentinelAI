@@ -130,3 +130,80 @@ def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = De
         }
         for log in logs
     ]
+
+@app.post("/network/hosts")
+def add_network_host(
+    ip_address: str,
+    hostname: str = None,
+    open_ports: str = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # If this IP already exists, update it instead of creating a duplicate
+    existing = db.query(models.NetworkDevice).filter(models.NetworkDevice.ip_address == ip_address).first()
+    if existing:
+        existing.hostname = hostname
+        existing.open_ports = open_ports
+        db.commit()
+        db.refresh(existing)
+        return {"id": existing.id, "ip_address": existing.ip_address, "status": "updated"}
+
+    device = models.NetworkDevice(ip_address=ip_address, hostname=hostname, open_ports=open_ports)
+    db.add(device)
+    db.commit()
+    db.refresh(device)
+    return {"id": device.id, "ip_address": device.ip_address, "status": "created"}
+
+
+@app.get("/network/hosts")
+def get_network_hosts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    devices = db.query(models.NetworkDevice).all()
+    return [
+        {
+            "id": d.id,
+            "ip_address": d.ip_address,
+            "hostname": d.hostname,
+            "open_ports": d.open_ports,
+            "last_seen": str(d.last_seen),
+        }
+        for d in devices
+    ]
+
+
+@app.post("/network/alerts")
+def add_snort_alert(
+    source_ip: str,
+    dest_ip: str,
+    alert_message: str,
+    severity: str = "medium",
+    raw_log: str = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    alert = models.SnortAlert(
+        source_ip=source_ip,
+        dest_ip=dest_ip,
+        alert_message=alert_message,
+        severity=severity,
+        raw_log=raw_log,
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return {"id": alert.id, "status": "created"}
+
+
+@app.get("/network/alerts")
+def get_snort_alerts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    alerts = db.query(models.SnortAlert).order_by(models.SnortAlert.created_at.desc()).all()
+    return [
+        {
+            "id": a.id,
+            "source_ip": a.source_ip,
+            "dest_ip": a.dest_ip,
+            "alert_message": a.alert_message,
+            "severity": a.severity,
+            "created_at": str(a.created_at),
+        }
+        for a in alerts
+    ]
