@@ -12,6 +12,7 @@ import models
 import os
 from dotenv import load_dotenv
 load_dotenv()
+from pydantic import BaseModel
 
 Base.metadata.create_all(bind=engine)
 
@@ -97,8 +98,16 @@ def get_ai_report(vuln_id: int, db: Session = Depends(get_db), current_user: mod
         "remediation": report.remediation,
     }
 
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
 @app.post("/register")
-def register(username: str, email: str, password: str, db: Session = Depends(get_db)):
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    username = payload.username
+    email = payload.email
+    password = payload.password
     existing = db.query(models.User).filter(models.User.username == username).first()
     if existing:
         return {"detail": "Username already exists"}
@@ -152,14 +161,21 @@ def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = De
         for log in logs
     ]
 
+class NetworkHostRequest(BaseModel):
+    ip_address: str
+    hostname: str = None
+    open_ports: str = None
+
 @app.post("/network/hosts")
 def add_network_host(
-    ip_address: str,
-    hostname: str = None,
-    open_ports: str = None,
+    payload: NetworkHostRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    ip_address = payload.ip_address
+    hostname = payload.hostname
+    open_ports = payload.open_ports
+    # If this IP already exists, update it instead of creating a duplicate
     # If this IP already exists, update it instead of creating a duplicate
     existing = db.query(models.NetworkDevice).filter(models.NetworkDevice.ip_address == ip_address).first()
     if existing:
@@ -191,16 +207,24 @@ def get_network_hosts(db: Session = Depends(get_db), current_user: models.User =
     ]
 
 
+class SnortAlertRequest(BaseModel):
+    source_ip: str
+    dest_ip: str
+    alert_message: str
+    severity: str = "medium"
+    raw_log: str = None
+
 @app.post("/network/alerts")
 def add_snort_alert(
-    source_ip: str,
-    dest_ip: str,
-    alert_message: str,
-    severity: str = "medium",
-    raw_log: str = None,
+    payload: SnortAlertRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    source_ip = payload.source_ip
+    dest_ip = payload.dest_ip
+    alert_message = payload.alert_message
+    severity = payload.severity
+    raw_log = payload.raw_log
     alert = models.SnortAlert(
         source_ip=source_ip,
         dest_ip=dest_ip,
