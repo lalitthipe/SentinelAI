@@ -1,3 +1,4 @@
+from groq import Groq
 from fastapi.responses import StreamingResponse
 import csv
 import io
@@ -8,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 import models
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,7 +19,10 @@ app = FastAPI(title="SentinelAI API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://192.168.56.101:5173",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,7 +37,7 @@ def require_admin(current_user: models.User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
-
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 @app.get("/health")
 def health():
@@ -241,3 +248,99 @@ def export_vulnerabilities_csv(db: Session = Depends(get_db), current_user: mode
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=vulnerabilities_report.csv"},
     )
+@app.get("/reports/vulnerabilities/pdf")
+def export_vulnerabilities_pdf(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    vulns = db.query(models.Vulnerability).all()
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = [Paragraph("SentinelAI Vulnerability Report", styles["Title"])]
+
+    data = [["Severity", "Title", "File", "Line", "Status"]]
+    for v in vulns:
+        data.append([v.severity, v.title[:50], v.file_path, str(v.line_number), v.status])
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3b82f6")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f0f0")]),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+
+    log_action(db, current_user.id, "report_exported", "Exported vulnerabilities PDF")
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=vulnerabilities_report.pdf"},
+    )
+
+@app.post("/ai-assistant/ask")
+def ask_ai_assistant(
+    question: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    prompt = f"""You are a helpful security analyst assistant embedded in a DevSecOps dashboard called SentinelAI. Answer the user's question clearly and concisely, in a way useful to a security engineer or developer. Keep answers focused and practical, 3-5 sentences unless the question needs more detail.
+
+Question: {question}
+"""
+
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    answer = response.choices[0].message.content
+    log_action(db, current_user.id, "ai_assistant_query", f"Asked: {question[:100]}")
+
+    return {"question": question, "answer": answer}
+
+@app.get("/dashboard/summary")
+def get_dashboard_summary(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    total_vulns = db.query(models.Vulnerability).count()
+
+    severity_counts = {}
+    for sev in ["critical", "high", "medium", "low"]:
+        severity_counts[sev] = db.query(models.Vulnerability).filter(models.Vulnerability.severity == sev).count()
+
+    recent_scans = (
+        db.query(models.Scan)
+        .order_by(models.Scan.started_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    total_hosts = db.query(models.NetworkDevice).count()
+    recent_alerts = db.query(models.SnortAlert).count()
+
+    score = 100 - (severity_counts["critical"] * 10 + severity_counts["high"] * 5 + severity_counts["medium"] * 2 + severity_counts["low"] * 1)
+    score = max(score, 0)
+
+    return {
+        "security_score": score,
+        "total_vulnerabilities": total_vulns,
+        "severity_counts": severity_counts,
+        "recent_scans": [
+            {
+                "id": s.id,
+                "scanner_type": s.scanner_type,
+                "status": s.status,
+                "started_at": str(s.started_at),
+            }
+            for s in recent_scans
+        ],
+        "total_hosts": total_hosts,
+        "total_alerts": recent_alerts,
+    }
