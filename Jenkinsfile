@@ -46,7 +46,7 @@ pipeline {
 
         stage('Gitleaks Scan') {
             steps {
-                sh 'gitleaks detect --source ${WORKSPACE} --report-format json --report-path ${WORKSPACE}/security/gitleaks/report.json --no-git --exclude-path ${WORKSPACE}/security --exclude-path ${WORKSPACE}/backend/.env || true'
+		sh 'gitleaks detect --source ${WORKSPACE} --config ${WORKSPACE}/.gitleaks.toml --report-format json --report-path ${WORKSPACE}/security/gitleaks/report.json --no-git || true'
             }
         }
 

@@ -1,0 +1,7 @@
+title = "SentinelAI gitleaks config"
+
+[allowlist]
+paths = [
+  '''backend/\.env''',
+  '''security/.*'''
+]
