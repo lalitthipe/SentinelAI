@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from database import SessionLocal
 from models import Scan, Vulnerability, AIReport
+
 SEVERITY_MAP = {
     "CRITICAL": "critical",
     "HIGH": "high",
@@ -23,13 +24,12 @@ def parse_trivy_report(report_path: str, project_id: int = 1):
     results = data.get("Results", []) or []
     db = SessionLocal()
     try:
-        # --- clear out vulnerabilities from previous trivy scans ---
         old_scan_ids = [
             s.id for s in db.query(Scan)
             .filter(Scan.project_id == project_id, Scan.scanner_type == "trivy")
             .all()
         ]
-	if old_scan_ids:
+        if old_scan_ids:
             old_vuln_ids = [
                 v.id for v in db.query(Vulnerability)
                 .filter(Vulnerability.scan_id.in_(old_scan_ids))
@@ -44,6 +44,7 @@ def parse_trivy_report(report_path: str, project_id: int = 1):
             ).delete(synchronize_session=False)
             db.query(Scan).filter(Scan.id.in_(old_scan_ids)).delete(synchronize_session=False)
             db.commit()
+
         scan = Scan(
             project_id=project_id,
             scanner_type="trivy",

@@ -22,14 +22,12 @@ def parse_semgrep_report(report_path: str, project_id: int = 1):
     results = data.get("results", [])
     db = SessionLocal()
     try:
-        # --- NEW: clear out vulnerabilities from previous semgrep scans
-        # for this project before inserting this run's results ---
         old_scan_ids = [
             s.id for s in db.query(Scan)
             .filter(Scan.project_id == project_id, Scan.scanner_type == "semgrep")
             .all()
         ]
-	if old_scan_ids:
+        if old_scan_ids:
             old_vuln_ids = [
                 v.id for v in db.query(Vulnerability)
                 .filter(Vulnerability.scan_id.in_(old_scan_ids))
@@ -44,7 +42,7 @@ def parse_semgrep_report(report_path: str, project_id: int = 1):
             ).delete(synchronize_session=False)
             db.query(Scan).filter(Scan.id.in_(old_scan_ids)).delete(synchronize_session=False)
             db.commit()
-        # Create one Scan row to represent this whole run
+
         scan = Scan(
             project_id=project_id,
             scanner_type="semgrep",
@@ -55,7 +53,6 @@ def parse_semgrep_report(report_path: str, project_id: int = 1):
         db.commit()
         db.refresh(scan)
 
-        # Insert one Vulnerability row per finding, deduped within this run
         seen = set()
         inserted = 0
         for result in results:
