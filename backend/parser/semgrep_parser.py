@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from database import SessionLocal
-from models import Scan, Vulnerability
+from models import Scan, Vulnerability, AIReport
 
 SEVERITY_MAP = {
     "ERROR": "high",
@@ -29,13 +29,21 @@ def parse_semgrep_report(report_path: str, project_id: int = 1):
             .filter(Scan.project_id == project_id, Scan.scanner_type == "semgrep")
             .all()
         ]
-        if old_scan_ids:
+	if old_scan_ids:
+            old_vuln_ids = [
+                v.id for v in db.query(Vulnerability)
+                .filter(Vulnerability.scan_id.in_(old_scan_ids))
+                .all()
+            ]
+            if old_vuln_ids:
+                db.query(AIReport).filter(
+                    AIReport.vulnerability_id.in_(old_vuln_ids)
+                ).delete(synchronize_session=False)
             db.query(Vulnerability).filter(
                 Vulnerability.scan_id.in_(old_scan_ids)
             ).delete(synchronize_session=False)
             db.query(Scan).filter(Scan.id.in_(old_scan_ids)).delete(synchronize_session=False)
             db.commit()
-
         # Create one Scan row to represent this whole run
         scan = Scan(
             project_id=project_id,
