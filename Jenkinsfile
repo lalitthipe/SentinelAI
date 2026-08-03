@@ -55,10 +55,10 @@ pipeline {
                 sh 'python3 ${WORKSPACE}/backend/parser/gitleaks_parser.py ${WORKSPACE}/security/gitleaks/report.json'
             }
         }
-        stage('Generate AI Reports') {
+	stage('Generate AI Reports') {
             steps {
-                sh 'python3 ${WORKSPACE}/backend/ai/generate_reports.py'
+                withCredentials([string(credentialsId: 'groq-api-key', variable: 'GROQ_API_KEY')]) {
+                    sh 'python3 ${WORKSPACE}/backend/ai/generate_reports.py'
+                }
             }
         }
-    }
-}
