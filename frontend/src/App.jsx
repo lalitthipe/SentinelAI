@@ -17,6 +17,12 @@ function App() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
+  const [networkHosts, setNetworkHosts] = useState([]);
+  const [networkAlerts, setNetworkAlerts] = useState([]);
+  const [scans, setScans] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditError, setAuditError] = useState("");
+
   useEffect(() => {
     fetch(`${API_BASE}/health`)
       .then((res) => res.json())
@@ -43,6 +49,49 @@ function App() {
     fetchVulnerabilities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, severityFilter]);
+
+  const fetchNetwork = () => {
+    if (!token) return;
+    fetch(`${API_BASE}/network/hosts`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => setNetworkHosts(Array.isArray(data) ? data : []))
+      .catch(() => setNetworkHosts([]));
+
+    fetch(`${API_BASE}/network/alerts`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => setNetworkAlerts(Array.isArray(data) ? data : []))
+      .catch(() => setNetworkAlerts([]));
+  };
+
+  const fetchScans = () => {
+    if (!token) return;
+    fetch(`${API_BASE}/scans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => setScans(Array.isArray(data) ? data : []))
+      .catch(() => setScans([]));
+  };
+
+  const fetchAuditLogs = () => {
+    if (!token) return;
+    setAuditError("");
+    fetch(`${API_BASE}/audit-logs`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setAuditLogs(data);
+        } else {
+          setAuditError(data.detail || "Could not load audit logs");
+        }
+      })
+      .catch(() => setAuditError("Could not reach backend"));
+  };
+
+  useEffect(() => {
+    if (activeTab === "network") fetchNetwork();
+    if (activeTab === "reports") fetchScans();
+    if (activeTab === "audit") fetchAuditLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, token]);
 
   const viewAiReport = (vulnId) => {
     setLoadingId(vulnId);
@@ -83,6 +132,21 @@ function App() {
       });
   };
 
+  const downloadCsv = () => {
+    fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.blob())
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "vulnerabilities_report.csv";
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
+  };
+
   const severityClass = (sev) => {
     switch (sev) {
       case "critical": return { background: "rgba(244,63,94,0.15)", color: "var(--critical)" };
@@ -98,6 +162,14 @@ function App() {
     critical: vulnerabilities.filter((v) => v.severity === "critical").length,
     high: vulnerabilities.filter((v) => v.severity === "high").length,
     medium: vulnerabilities.filter((v) => v.severity === "medium").length,
+  };
+
+  const tabTitles = {
+    vulnerabilities: "Vulnerabilities",
+    assistant: "AI Assistant",
+    network: "Network & IDS",
+    reports: "Reports",
+    audit: "Audit Log",
   };
 
   if (!token) {
@@ -123,10 +195,28 @@ function App() {
             Vulnerabilities
           </button>
           <button
+            className={`nav-item ${activeTab === "network" ? "active" : ""}`}
+            onClick={() => setActiveTab("network")}
+          >
+            Network & IDS
+          </button>
+          <button
+            className={`nav-item ${activeTab === "reports" ? "active" : ""}`}
+            onClick={() => setActiveTab("reports")}
+          >
+            Reports
+          </button>
+          <button
             className={`nav-item ${activeTab === "assistant" ? "active" : ""}`}
             onClick={() => setActiveTab("assistant")}
           >
             AI Assistant
+          </button>
+          <button
+            className={`nav-item ${activeTab === "audit" ? "active" : ""}`}
+            onClick={() => setActiveTab("audit")}
+          >
+            Audit Log
           </button>
         </nav>
 
@@ -139,9 +229,7 @@ function App() {
 
       <main className="main">
         <div className="topbar">
-          <h1 className="page-title">
-            {activeTab === "vulnerabilities" ? "Vulnerabilities" : "AI Assistant"}
-          </h1>
+          <h1 className="page-title">{tabTitles[activeTab]}</h1>
           <div className="status-pill">
             <span className={`status-dot ${status !== "ok" ? "down" : ""}`}></span>
             {status === "ok" ? "SYSTEM NOMINAL" : "BACKEND UNREACHABLE"}
@@ -170,11 +258,7 @@ function App() {
             </div>
 
             <div className="controls-row">
-              <select
-                className="select"
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
-              >
+              <select className="select" value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)}>
                 <option value="">All Severities</option>
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
@@ -191,32 +275,8 @@ function App() {
                 onKeyDown={(e) => e.key === "Enter" && fetchVulnerabilities()}
               />
 
-              <button className="btn btn-primary" onClick={fetchVulnerabilities}>
-                Search
-              </button>
-	      <a
-
-              
-                href={`${API_BASE}/reports/vulnerabilities/csv`}
-                className="btn btn-secondary"
-                onClick={(e) => {
-                  e.preventDefault();
-                  fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                  })
-                    .then((res) => res.blob())
-                    .then((blob) => {
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = "vulnerabilities_report.csv";
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                    });
-                }}
-              >
-                Export CSV
-              </a>
+              <button className="btn btn-primary" onClick={fetchVulnerabilities}>Search</button>
+              <button className="btn btn-secondary" onClick={downloadCsv}>Export CSV</button>
             </div>
 
             <div className="table-wrap">
@@ -233,11 +293,7 @@ function App() {
                 <tbody>
                   {vulnerabilities.map((v) => (
                     <tr key={v.id}>
-                      <td>
-                        <span className="severity-badge" style={severityClass(v.severity)}>
-                          {v.severity}
-                        </span>
-                      </td>
+                      <td><span className="severity-badge" style={severityClass(v.severity)}>{v.severity}</span></td>
                       <td>{v.title}</td>
                       <td className="mono">{v.file_path}</td>
                       <td className="mono">{v.line_number}</td>
@@ -249,11 +305,7 @@ function App() {
                     </tr>
                   ))}
                   {vulnerabilities.length === 0 && (
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: "center", color: "var(--text-faint)", padding: "24px" }}>
-                        No findings match the current filters.
-                      </td>
-                    </tr>
+                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--text-faint)", padding: "24px" }}>No findings match the current filters.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -266,19 +318,120 @@ function App() {
                   <p style={{ color: "var(--text-dim)" }}>{selectedReport.detail}</p>
                 ) : (
                   <>
-                    <p style={{ color: "var(--text-dim)" }}>
-                      Risk Score: <span className="risk-score">{selectedReport.risk_score}/10</span>
-                    </p>
+                    <p style={{ color: "var(--text-dim)" }}>Risk Score: <span className="risk-score">{selectedReport.risk_score}/10</span></p>
                     <p><strong>Summary:</strong> {selectedReport.summary}</p>
                     <p><strong>Remediation:</strong> {selectedReport.remediation}</p>
                   </>
                 )}
-                <button className="btn btn-secondary" onClick={() => setSelectedReport(null)}>
-                  Close
-                </button>
+                <button className="btn btn-secondary" onClick={() => setSelectedReport(null)}>Close</button>
               </div>
             )}
           </>
+        )}
+
+        {activeTab === "network" && (
+          <>
+            <h3 style={{ fontSize: "14px", color: "var(--text-dim)", marginBottom: "10px" }}>Discovered Hosts</h3>
+            <div className="table-wrap" style={{ marginBottom: "28px" }}>
+              <table>
+                <thead>
+                  <tr><th>IP Address</th><th>Hostname</th><th>Open Ports</th><th>Last Seen</th></tr>
+                </thead>
+                <tbody>
+                  {networkHosts.map((h) => (
+                    <tr key={h.id}>
+                      <td className="mono">{h.ip_address}</td>
+                      <td>{h.hostname || "—"}</td>
+                      <td className="mono">{h.open_ports || "—"}</td>
+                      <td className="mono">{h.last_seen}</td>
+                    </tr>
+                  ))}
+                  {networkHosts.length === 0 && (
+                    <tr><td colSpan="4" style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>No hosts discovered yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 style={{ fontSize: "14px", color: "var(--text-dim)", marginBottom: "10px" }}>Snort Alerts</h3>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Severity</th><th>Source</th><th>Destination</th><th>Message</th><th>Time</th></tr>
+                </thead>
+                <tbody>
+                  {networkAlerts.map((a) => (
+                    <tr key={a.id}>
+                      <td><span className="severity-badge" style={severityClass(a.severity)}>{a.severity}</span></td>
+                      <td className="mono">{a.source_ip}</td>
+                      <td className="mono">{a.dest_ip}</td>
+                      <td>{a.alert_message}</td>
+                      <td className="mono">{a.created_at}</td>
+                    </tr>
+                  ))}
+                  {networkAlerts.length === 0 && (
+                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>No alerts recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === "reports" && (
+          <>
+            <div className="controls-row">
+              <button className="btn btn-primary" onClick={downloadCsv}>Export Vulnerabilities CSV</button>
+            </div>
+
+            <h3 style={{ fontSize: "14px", color: "var(--text-dim)", marginBottom: "10px" }}>Scan History</h3>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Scanner</th><th>Status</th><th>Started At</th></tr>
+                </thead>
+                <tbody>
+                  {scans.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.scanner_type}</td>
+                      <td>{s.status}</td>
+                      <td className="mono">{s.started_at}</td>
+                    </tr>
+                  ))}
+                  {scans.length === 0 && (
+                    <tr><td colSpan="3" style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>No scans recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === "audit" && (
+          <div className="table-wrap">
+            {auditError ? (
+              <p style={{ padding: "20px", color: "var(--critical)" }}>{auditError}</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr><th>User ID</th><th>Action</th><th>Details</th><th>Timestamp</th></tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="mono">{log.user_id}</td>
+                      <td>{log.action}</td>
+                      <td>{log.details}</td>
+                      <td className="mono">{log.timestamp}</td>
+                    </tr>
+                  ))}
+                  {auditLogs.length === 0 && (
+                    <tr><td colSpan="4" style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>No audit entries yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
 
         {activeTab === "assistant" && (
@@ -309,9 +462,7 @@ function App() {
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && askAssistant()}
               />
-              <button className="btn btn-primary" onClick={askAssistant} disabled={chatLoading}>
-                Ask
-              </button>
+              <button className="btn btn-primary" onClick={askAssistant} disabled={chatLoading}>Ask</button>
             </div>
           </div>
         )}
