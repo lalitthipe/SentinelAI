@@ -16,11 +16,6 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [dashboardData, setDashboardData] = useState(null);
-
-  const [networkHosts, setNetworkHosts] = useState([]);
-  const [snortAlerts, setSnortAlerts] = useState([]);
-  const [scanHistory, setScanHistory] = useState([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/health`)
@@ -44,69 +39,10 @@ function App() {
       .catch(() => setVulnerabilities([]));
   };
 
-  const fetchDashboard = () => {
-    if (!token) return;
-    fetch(`${API_BASE}/dashboard/summary`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setDashboardData(data))
-      .catch(() => setDashboardData(null));
-  };
-  const fetchNetworkData = () => {
-    if (!token) return;
-    fetch(`${API_BASE}/network/hosts`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setNetworkHosts(Array.isArray(data) ? data : []))
-      .catch(() => setNetworkHosts([]));
-
-    fetch(`${API_BASE}/network/alerts`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setSnortAlerts(Array.isArray(data) ? data : []))
-      .catch(() => setSnortAlerts([]));
-  };
-  const fetchScanHistory = () => {
-    if (!token) return;
-    fetch(`${API_BASE}/scans`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setScanHistory(Array.isArray(data) ? data : []))
-      .catch(() => setScanHistory([]));
-  };
-
-  const downloadPdfReport = () => {
-    fetch(`${API_BASE}/reports/vulnerabilities/pdf`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.blob())
-      .then((blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "vulnerabilities_report.pdf";
-        a.click();
-        window.URL.revokeObjectURL(url);
-      });
-  };
   useEffect(() => {
     fetchVulnerabilities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, severityFilter]);
-  useEffect(() => {
-    if (activeTab === "dashboard") fetchDashboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, token]);
-  useEffect(() => {
-    if (activeTab === "dashboard") fetchDashboard();
-    if (activeTab === "network") fetchNetworkData();
-    if (activeTab === "reports") fetchScanHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, token]);
 
   const viewAiReport = (vulnId) => {
     setLoadingId(vulnId);
@@ -147,14 +83,21 @@ function App() {
       });
   };
 
-  const severityColor = (sev) => {
+  const severityClass = (sev) => {
     switch (sev) {
-      case "critical": return "#ff4d4d";
-      case "high": return "#ff944d";
-      case "medium": return "#ffd24d";
-      case "low": return "#8ac926";
-      default: return "#ccc";
+      case "critical": return { background: "rgba(244,63,94,0.15)", color: "var(--critical)" };
+      case "high": return { background: "rgba(251,146,60,0.15)", color: "var(--high)" };
+      case "medium": return { background: "rgba(251,191,36,0.15)", color: "var(--medium)" };
+      case "low": return { background: "rgba(74,222,128,0.15)", color: "var(--low)" };
+      default: return { background: "rgba(139,147,168,0.15)", color: "var(--text-dim)" };
     }
+  };
+
+  const counts = {
+    total: vulnerabilities.length,
+    critical: vulnerabilities.filter((v) => v.severity === "critical").length,
+    high: vulnerabilities.filter((v) => v.severity === "high").length,
+    medium: vulnerabilities.filter((v) => v.severity === "medium").length,
   };
 
   if (!token) {
@@ -162,433 +105,217 @@ function App() {
   }
 
   return (
-    <div style={{ fontFamily: "sans-serif", padding: "2rem", color: "#eee", background: "#111", minHeight: "100vh" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>SentinelAI</h1>
-        <button
-          onClick={() => setToken(null)}
-          style={{
-            background: "#333", color: "#eee", border: "1px solid #555",
-            padding: "6px 14px", borderRadius: "4px", cursor: "pointer", height: "fit-content",
-          }}
-        >
-          Log Out
-        </button>
-      </div>
-      <p>Backend status: {status}</p>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">S</div>
+          <div className="brand-text">
+            <span className="brand-title">SentinelAI</span>
+            <span className="brand-sub">SOC Dashboard</span>
+          </div>
+        </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", margin: "1rem 0" }}>
-        <button
-          onClick={() => setActiveTab("vulnerabilities")}
-          style={{
-            background: activeTab === "vulnerabilities" ? "#3b82f6" : "#333",
-            color: "#fff", border: "none", padding: "8px 16px",
-            borderRadius: "4px", cursor: "pointer",
-          }}
-        >
-          Vulnerabilities
-        </button>
-        <button
-          onClick={() => setActiveTab("assistant")}
-          style={{
-            background: activeTab === "assistant" ? "#3b82f6" : "#333",
-            color: "#fff", border: "none", padding: "8px 16px",
-            borderRadius: "4px", cursor: "pointer",
-          }}
-        >
-          AI Assistant
-        </button>
-	<button
-          onClick={() => setActiveTab("dashboard")}
-          style={{
-            background: activeTab === "dashboard" ? "#3b82f6" : "#333",
-            color: "#fff", border: "none", padding: "8px 16px",
-            borderRadius: "4px", cursor: "pointer",
-          }}
-        >
-          Dashboard
-        </button>
-	<button
-          onClick={() => setActiveTab("network")}
-          style={{
-            background: activeTab === "network" ? "#3b82f6" : "#333",
-            color: "#fff", border: "none", padding: "8px 16px",
-            borderRadius: "4px", cursor: "pointer",
-          }}
-        >
-          Network
-        </button>
-	<button
-          onClick={() => setActiveTab("reports")}
-          style={{
-            background: activeTab === "reports" ? "#3b82f6" : "#333",
-            color: "#fff", border: "none", padding: "8px 16px",
-            borderRadius: "4px", cursor: "pointer",
-          }}
-        >
-          Reports
-        </button>
-      </div>
-      {activeTab === "dashboard" && (
-        <div>
-          <h2>Dashboard</h2>
-          {!dashboardData ? (
-            <p>Loading...</p>
-          ) : (
-            <>
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-                <div style={{ background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "1rem", minWidth: "160px" }}>
-                  <p style={{ color: "#aaa", margin: 0 }}>Security Score</p>
-                  <p style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{dashboardData.security_score}</p>
-                </div>
-                <div style={{ background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "1rem", minWidth: "160px" }}>
-                  <p style={{ color: "#aaa", margin: 0 }}>Total Vulnerabilities</p>
-                  <p style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{dashboardData.total_vulnerabilities}</p>
-                </div>
-                <div style={{ background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "1rem", minWidth: "160px" }}>
-                  <p style={{ color: "#aaa", margin: 0 }}>Network Hosts</p>
-                  <p style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{dashboardData.total_hosts}</p>
-                </div>
-                <div style={{ background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "1rem", minWidth: "160px" }}>
-                  <p style={{ color: "#aaa", margin: 0 }}>Snort Alerts</p>
-                  <p style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>{dashboardData.total_alerts}</p>
-                </div>
+        <nav className="nav">
+          <button
+            className={`nav-item ${activeTab === "vulnerabilities" ? "active" : ""}`}
+            onClick={() => setActiveTab("vulnerabilities")}
+          >
+            Vulnerabilities
+          </button>
+          <button
+            className={`nav-item ${activeTab === "assistant" ? "active" : ""}`}
+            onClick={() => setActiveTab("assistant")}
+          >
+            AI Assistant
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <button className="logout-btn" onClick={() => setToken(null)}>
+            Log Out
+          </button>
+        </div>
+      </aside>
+
+      <main className="main">
+        <div className="topbar">
+          <h1 className="page-title">
+            {activeTab === "vulnerabilities" ? "Vulnerabilities" : "AI Assistant"}
+          </h1>
+          <div className="status-pill">
+            <span className={`status-dot ${status !== "ok" ? "down" : ""}`}></span>
+            {status === "ok" ? "SYSTEM NOMINAL" : "BACKEND UNREACHABLE"}
+          </div>
+        </div>
+
+        {activeTab === "vulnerabilities" && (
+          <>
+            <div className="stats-row">
+              <div className="stat-card">
+                <div className="stat-label">Total Findings</div>
+                <div className="stat-value">{counts.total}</div>
               </div>
-
-              <h3>Severity Breakdown</h3>
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
-                {Object.entries(dashboardData.severity_counts).map(([sev, count]) => (
-                  <div key={sev} style={{
-                    background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px",
-                    padding: "0.75rem 1.25rem", textAlign: "center",
-                  }}>
-                    <p style={{ color: severityColor(sev), fontWeight: "bold", margin: 0, textTransform: "capitalize" }}>{sev}</p>
-                    <p style={{ fontSize: "1.5rem", margin: 0 }}>{count}</p>
-                  </div>
-                ))}
+              <div className="stat-card">
+                <div className="stat-label">Critical</div>
+                <div className="stat-value" style={{ color: "var(--critical)" }}>{counts.critical}</div>
               </div>
+              <div className="stat-card">
+                <div className="stat-label">High</div>
+                <div className="stat-value" style={{ color: "var(--high)" }}>{counts.high}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Medium</div>
+                <div className="stat-value" style={{ color: "var(--medium)" }}>{counts.medium}</div>
+              </div>
+            </div>
 
-              <h3>Recent Scans</h3>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div className="controls-row">
+              <select
+                className="select"
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+              >
+                <option value="">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+
+              <input
+                type="text"
+                className="text-input"
+                placeholder="Search by title..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && fetchVulnerabilities()}
+              />
+
+              <button className="btn btn-primary" onClick={fetchVulnerabilities}>
+                Search
+              </button>
+	      <a
+
+              
+                href={`${API_BASE}/reports/vulnerabilities/csv`}
+                className="btn btn-secondary"
+                onClick={(e) => {
+                  e.preventDefault();
+                  fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                  })
+                    .then((res) => res.blob())
+                    .then((blob) => {
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "vulnerabilities_report.csv";
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    });
+                }}
+              >
+                Export CSV
+              </a>
+            </div>
+
+            <div className="table-wrap">
+              <table>
                 <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid #444" }}>
-                    <th style={{ padding: "8px" }}>Scanner</th>
-                    <th style={{ padding: "8px" }}>Status</th>
-                    <th style={{ padding: "8px" }}>Started At</th>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Finding</th>
+                    <th>File</th>
+                    <th>Line</th>
+                    <th>Analysis</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dashboardData.recent_scans.map((s) => (
-                    <tr key={s.id} style={{ borderBottom: "1px solid #333" }}>
-                      <td style={{ padding: "8px" }}>{s.scanner_type}</td>
-                      <td style={{ padding: "8px" }}>{s.status}</td>
-                      <td style={{ padding: "8px" }}>{s.started_at}</td>
+                  {vulnerabilities.map((v) => (
+                    <tr key={v.id}>
+                      <td>
+                        <span className="severity-badge" style={severityClass(v.severity)}>
+                          {v.severity}
+                        </span>
+                      </td>
+                      <td>{v.title}</td>
+                      <td className="mono">{v.file_path}</td>
+                      <td className="mono">{v.line_number}</td>
+                      <td>
+                        <button className="view-btn" onClick={() => viewAiReport(v.id)}>
+                          {loadingId === v.id ? "Loading..." : "View"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {vulnerabilities.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: "center", color: "var(--text-faint)", padding: "24px" }}>
+                        No findings match the current filters.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-            </>
-          )}
-        </div>
-      )}
+            </div>
 
-       {activeTab === "network" && (
-        <div>
-          <h2>Network</h2>
+            {selectedReport && (
+              <div className="report-panel">
+                <h3>AI Analysis — Finding #{selectedReport.vulnId}</h3>
+                {selectedReport.detail ? (
+                  <p style={{ color: "var(--text-dim)" }}>{selectedReport.detail}</p>
+                ) : (
+                  <>
+                    <p style={{ color: "var(--text-dim)" }}>
+                      Risk Score: <span className="risk-score">{selectedReport.risk_score}/10</span>
+                    </p>
+                    <p><strong>Summary:</strong> {selectedReport.summary}</p>
+                    <p><strong>Remediation:</strong> {selectedReport.remediation}</p>
+                  </>
+                )}
+                <button className="btn btn-secondary" onClick={() => setSelectedReport(null)}>
+                  Close
+                </button>
+              </div>
+            )}
+          </>
+        )}
 
-          <h3>Active Hosts</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "2rem" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #444" }}>
-                <th style={{ padding: "8px" }}>IP Address</th>
-                <th style={{ padding: "8px" }}>Hostname</th>
-                <th style={{ padding: "8px" }}>Open Ports</th>
-                <th style={{ padding: "8px" }}>Last Seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {networkHosts.map((h) => (
-                <tr key={h.id} style={{ borderBottom: "1px solid #333" }}>
-                  <td style={{ padding: "8px" }}>{h.ip_address}</td>
-                  <td style={{ padding: "8px" }}>{h.hostname || "—"}</td>
-                  <td style={{ padding: "8px" }}>{h.open_ports || "—"}</td>
-                  <td style={{ padding: "8px" }}>{h.last_seen}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {activeTab === "assistant" && (
+          <div style={{ maxWidth: "700px" }}>
+            <p style={{ color: "var(--text-faint)", marginTop: "-8px", marginBottom: "18px" }}>
+              Ask a security question — e.g. "What is SQL Injection?"
+            </p>
 
-          <h3>Snort Alerts</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #444" }}>
-                <th style={{ padding: "8px" }}>Severity</th>
-                <th style={{ padding: "8px" }}>Source IP</th>
-                <th style={{ padding: "8px" }}>Dest IP</th>
-                <th style={{ padding: "8px" }}>Message</th>
-                <th style={{ padding: "8px" }}>Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {snortAlerts.map((a) => (
-                <tr key={a.id} style={{ borderBottom: "1px solid #333" }}>
-                  <td style={{ padding: "8px", color: severityColor(a.severity), fontWeight: "bold" }}>{a.severity}</td>
-                  <td style={{ padding: "8px" }}>{a.source_ip}</td>
-                  <td style={{ padding: "8px" }}>{a.dest_ip}</td>
-                  <td style={{ padding: "8px" }}>{a.alert_message}</td>
-                  <td style={{ padding: "8px" }}>{a.created_at}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {activeTab === "reports" && (
-        <div>
-          <h2>Reports</h2>
-
-          <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
-            <button
-              onClick={downloadPdfReport}
-              style={{
-                background: "#ef4444", color: "#fff", border: "none",
-                padding: "8px 16px", borderRadius: "4px", cursor: "pointer",
-              }}
-            >
-              Download PDF Report
-            </button>
-            <button
-              onClick={() => {
-                fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                  .then((res) => res.blob())
-                  .then((blob) => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "vulnerabilities_report.csv";
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                  });
-              }}
-              style={{
-                background: "#22c55e", color: "#fff", border: "none",
-                padding: "8px 16px", borderRadius: "4px", cursor: "pointer",
-              }}
-            >
-              Download CSV Report
-            </button>
-          </div>
-
-          <h3>Scan History</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #444" }}>
-                <th style={{ padding: "8px" }}>Scanner</th>
-                <th style={{ padding: "8px" }}>Status</th>
-                <th style={{ padding: "8px" }}>Started At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scanHistory.map((s) => (
-                <tr key={s.id} style={{ borderBottom: "1px solid #333" }}>
-                  <td style={{ padding: "8px" }}>{s.scanner_type}</td>
-                  <td style={{ padding: "8px" }}>{s.status}</td>
-                  <td style={{ padding: "8px" }}>{s.started_at}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {activeTab === "vulnerabilities" && (
-        <>
-          <h2>Vulnerabilities</h2>
-
-          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              style={{ padding: "6px", background: "#222", color: "#eee", border: "1px solid #444", borderRadius: "4px" }}
-            >
-              <option value="">All Severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-
-            <input
-              type="text"
-              placeholder="Search by title..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchVulnerabilities()}
-              style={{
-                padding: "6px", background: "#222", color: "#eee",
-                border: "1px solid #444", borderRadius: "4px", flexGrow: 1,
-              }}
-            />
-
-            <button
-              onClick={fetchVulnerabilities}
-              style={{
-                background: "#3b82f6", color: "#fff", border: "none",
-                padding: "6px 16px", borderRadius: "4px", cursor: "pointer",
-              }}
-            >
-              Search
-            </button>
-
-            <a
-              href={`${API_BASE}/reports/vulnerabilities/csv`}
-              onClick={(e) => {
-                e.preventDefault();
-                fetch(`${API_BASE}/reports/vulnerabilities/csv`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                  .then((res) => res.blob())
-                  .then((blob) => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "vulnerabilities_report.csv";
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                  });
-              }}
-              style={{
-                background: "#22c55e", color: "#fff", border: "none",
-                padding: "6px 16px", borderRadius: "4px", cursor: "pointer",
-                textDecoration: "none", display: "inline-flex", alignItems: "center",
-              }}
-            >
-              Download CSV
-            </a>
-          </div>
-
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #444" }}>
-                <th style={{ padding: "8px" }}>Severity</th>
-                <th style={{ padding: "8px" }}>Title</th>
-                <th style={{ padding: "8px" }}>File</th>
-                <th style={{ padding: "8px" }}>Line</th>
-                <th style={{ padding: "8px" }}>AI Analysis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vulnerabilities.map((v) => (
-                <tr key={v.id} style={{ borderBottom: "1px solid #333" }}>
-                  <td style={{ padding: "8px", color: severityColor(v.severity), fontWeight: "bold" }}>
-                    {v.severity}
-                  </td>
-                  <td style={{ padding: "8px" }}>{v.title}</td>
-                  <td style={{ padding: "8px" }}>{v.file_path}</td>
-                  <td style={{ padding: "8px" }}>{v.line_number}</td>
-                  <td style={{ padding: "8px" }}>
-                    <button
-                      onClick={() => viewAiReport(v.id)}
-                      style={{
-                        background: "#333", color: "#eee", border: "1px solid #555",
-                        padding: "4px 10px", borderRadius: "4px", cursor: "pointer",
-                      }}
-                    >
-                      {loadingId === v.id ? "Loading..." : "View"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {selectedReport && (
-            <div style={{
-              marginTop: "2rem", padding: "1.5rem", border: "1px solid #444",
-              borderRadius: "8px", background: "#1a1a1a", maxWidth: "700px",
-            }}>
-              <h3>AI Analysis — Vulnerability #{selectedReport.vulnId}</h3>
-              {selectedReport.detail ? (
-                <p>{selectedReport.detail}</p>
-              ) : (
-                <>
-                  <p><strong>Risk Score:</strong> {selectedReport.risk_score} / 10</p>
-                  <p><strong>Summary:</strong> {selectedReport.summary}</p>
-                  <p><strong>Remediation:</strong> {selectedReport.remediation}</p>
-                </>
+            <div className="chat-window">
+              {chatMessages.length === 0 && (
+                <p style={{ color: "var(--text-faint)" }}>No messages yet — ask something below.</p>
               )}
-              <button
-                onClick={() => setSelectedReport(null)}
-                style={{
-                  marginTop: "1rem", background: "#333", color: "#eee",
-                  border: "1px solid #555", padding: "4px 10px", borderRadius: "4px", cursor: "pointer",
-                }}
-              >
-                Close
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  <span className={`chat-bubble ${msg.role}`}>{msg.text}</span>
+                </div>
+              ))}
+              {chatLoading && <p style={{ color: "var(--text-faint)" }}>Thinking...</p>}
+            </div>
+
+            <div className="chat-input-row">
+              <input
+                type="text"
+                className="text-input"
+                style={{ flexGrow: 1 }}
+                placeholder="Ask a security question..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && askAssistant()}
+              />
+              <button className="btn btn-primary" onClick={askAssistant} disabled={chatLoading}>
+                Ask
               </button>
             </div>
-          )}
-        </>
-      )}
-
-      {activeTab === "assistant" && (
-        <div style={{ maxWidth: "700px" }}>
-          <h2>AI Assistant</h2>
-          <p style={{ color: "#aaa" }}>Ask a security question, e.g. "What is SQL Injection?"</p>
-
-          <div style={{
-            border: "1px solid #333", borderRadius: "8px", background: "#1a1a1a",
-            padding: "1rem", minHeight: "300px", maxHeight: "400px", overflowY: "auto", marginBottom: "1rem",
-          }}>
-            {chatMessages.length === 0 && (
-              <p style={{ color: "#666" }}>No messages yet — ask something below.</p>
-            )}
-            {chatMessages.map((msg, i) => (
-              <div
-                key={i}
-                style={{
-                  marginBottom: "0.75rem",
-                  textAlign: msg.role === "user" ? "right" : "left",
-                }}
-              >
-                <span style={{
-                  display: "inline-block", padding: "8px 12px", borderRadius: "8px",
-                  background: msg.role === "user" ? "#3b82f6" : "#333",
-                  color: "#fff", maxWidth: "80%",
-                }}>
-                  {msg.text}
-                </span>
-              </div>
-            ))}
-            {chatLoading && <p style={{ color: "#888" }}>Thinking...</p>}
           </div>
-
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              type="text"
-              placeholder="Ask a security question..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && askAssistant()}
-              style={{
-                flexGrow: 1, padding: "8px", background: "#222", color: "#eee",
-                border: "1px solid #444", borderRadius: "4px",
-              }}
-            />
-            <button
-              onClick={askAssistant}
-              disabled={chatLoading}
-              style={{
-                background: "#3b82f6", color: "#fff", border: "none",
-                padding: "8px 20px", borderRadius: "4px", cursor: "pointer",
-              }}
-            >
-              Ask
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

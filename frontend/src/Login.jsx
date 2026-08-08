@@ -38,82 +38,40 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-        background: "#111",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "#1a1a1a",
-          padding: "2rem",
-          borderRadius: "8px",
-          border: "1px solid #333",
-          width: "320px",
-          color: "#eee",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>SentinelAI Login</h2>
+    <div className="login-shell">
+      <form onSubmit={handleSubmit} className="login-card">
+        <div className="login-brand">
+          <div className="brand-mark">S</div>
+          <div>
+            <p className="login-title">SentinelAI</p>
+            <p className="login-sub">SOC ACCESS PORTAL</p>
+          </div>
+        </div>
 
-        <label style={{ display: "block", marginBottom: "4px" }}>Username</label>
+        <label className="field-label">Username</label>
         <input
           type="text"
+          className="text-input"
+          style={{ width: "100%", marginBottom: "14px" }}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "8px",
-            marginBottom: "1rem",
-            background: "#222",
-            border: "1px solid #444",
-            borderRadius: "4px",
-            color: "#eee",
-            boxSizing: "border-box",
-          }}
           required
         />
 
-        <label style={{ display: "block", marginBottom: "4px" }}>Password</label>
+        <label className="field-label">Password</label>
         <input
           type="password"
+          className="text-input"
+          style={{ width: "100%", marginBottom: "18px" }}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "8px",
-            marginBottom: "1rem",
-            background: "#222",
-            border: "1px solid #444",
-            borderRadius: "4px",
-            color: "#eee",
-            boxSizing: "border-box",
-          }}
           required
         />
 
-        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+        {error && <p className="login-error">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "10px",
-            background: "#3b82f6",
-            border: "none",
-            borderRadius: "4px",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          {loading ? "Logging in..." : "Log In"}
+        <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
+          {loading ? "Authenticating..." : "Log In"}
         </button>
       </form>
     </div>
